@@ -1,4 +1,6 @@
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, Tuple, Type, TypeVar, Union, cast, get_type_hints
+import collections
+import typing
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Tuple, Type, TypeVar, Union, cast, get_type_hints
 
 from .class_validators import gather_all_validators
 from .fields import FieldInfo, ModelField
@@ -8,6 +10,7 @@ from .utils import lenient_issubclass
 _generic_types_cache: Dict[Tuple[Type[Any], Union[Any, Tuple[Any, ...]]], Type[BaseModel]] = {}
 GenericModelT = TypeVar('GenericModelT', bound='GenericModel')
 TypeVarType = Any  # since mypy doesn't allow the use of TypeVar as a type
+_builtin_type_map = {list: List, tuple: Tuple, dict: Dict}
 
 
 class GenericModel(BaseModel):
@@ -36,8 +39,10 @@ class GenericModel(BaseModel):
 
         check_parameters_count(cls, params)
         typevars_map: Dict[TypeVarType, Type[Any]] = dict(zip(cls.__parameters__, params))
+        if typevars_map and all(k is v for k, v in typevars_map.items()):
+            return cls
         type_hints = get_type_hints(cls).items()
-        instance_type_hints = {k: v for k, v in type_hints if getattr(v, '__origin__', None) is not ClassVar}
+        instance_type_hints = {k: v for k, v in type_hints if _get_origin(v) is not ClassVar}
         concrete_type_hints: Dict[str, Type[Any]] = {
             k: resolve_type_hint(v, typevars_map) for k, v in instance_type_hints.items()
         }
@@ -79,9 +84,14 @@ class GenericModel(BaseModel):
 
 
 def resolve_type_hint(type_: Any, typevars_map: Dict[Any, Any]) -> Type[Any]:
-    if hasattr(type_, '__origin__') and getattr(type_, '__parameters__', None):
-        concrete_type_args = tuple([typevars_map[x] for x in type_.__parameters__])
-        return type_[concrete_type_args]
+    type_args = _get_args(type_)
+    if type_args:
+        concrete_type_args = tuple(resolve_type_hint(arg, typevars_map) for arg in type_args)
+        origin_type = _get_origin(type_) or type_
+        origin_type = _builtin_type_map.get(origin_type, origin_type)
+        return origin_type[concrete_type_args]
+    if lenient_issubclass(type_, GenericModel) and not type_.__concrete__:
+        return type_[tuple(resolve_type_hint(t, typevars_map) for t in type_.__parameters__)]
     return typevars_map.get(type_, type_)
 
 
@@ -113,4 +123,34 @@ def _parameterize_generic_field(field_type: Type[Any], typevars_map: Dict[TypeVa
 
 
 def _is_typevar(v: Any) -> bool:
+    if lenient_issubclass(v, GenericModel):
+        return not v.__concrete__
+    args = _get_args(v)
+    if args and any(_is_typevar(arg) for arg in args):
+        return True
     return isinstance(v, TypeVar)  # type: ignore
+
+
+def _get_args(tp: Any) -> Any:
+    """Simplified Backport of `typing.get_args` as it is only available for python 3.8."""
+    try:  # pragma: no cover
+        return cast(typing.Any, typing).get_args(tp)
+    except AttributeError:
+        pass
+    if isinstance(tp, typing._GenericAlias):  # type: ignore
+        res = tp.__args__
+        if tp.__origin__ is collections.abc.Callable and res[0] is not Ellipsis:
+            res = (list(res[:-1]), res[-1])
+        return res
+    return ()
+
+
+def _get_origin(tp: Any) -> Any:
+    """Simplified Backport of `typing.get_origin` as it is only available for python 3.8."""
+    try:  # pragma: no cover
+        return cast(typing.Any, typing).get_origin(tp)
+    except AttributeError:
+        pass
+    if isinstance(tp, typing._GenericAlias):  # type: ignore
+        return tp.__origin__
+    return None

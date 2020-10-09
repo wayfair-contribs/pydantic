@@ -5,7 +5,7 @@ from typing import Any, ClassVar, Dict, Generic, List, Optional, Tuple, Type, Ty
 import pytest
 
 from pydantic import BaseModel, Field, ValidationError, root_validator, validator
-from pydantic.generics import GenericModel, _generic_types_cache
+from pydantic.generics import GenericModel, _generic_types_cache, _is_typevar
 
 skip_36 = pytest.mark.skipif(sys.version_info < (3, 7), reason='generics only supported for python 3.7 and above')
 
@@ -599,3 +599,51 @@ def test_multiple_specification():
         {'loc': ('a',), 'msg': 'none is not an allowed value', 'type': 'type_error.none.not_allowed'},
         {'loc': ('b',), 'msg': 'none is not an allowed value', 'type': 'type_error.none.not_allowed'},
     ]
+
+
+@skip_36
+def test_is_typevar():
+    T = TypeVar('T')
+
+    class Model(GenericModel, Generic[T]):
+        a: T
+
+    assert _is_typevar(Model[T])
+    assert _is_typevar(Optional[List[Union[str, Model[T]]]])
+    assert not _is_typevar(Optional[List[Union[str, Model[int]]]])
+
+
+@skip_36
+def test_nested_identity_parameterization():
+    T = TypeVar('T')
+    T2 = TypeVar('T2')
+
+    class Model(GenericModel, Generic[T]):
+        a: T
+
+    assert Model[T][T][T] is Model
+    assert Model[T] is Model
+    assert Model[T2] is not Model
+
+
+@skip_36
+def test_inner_types():
+    T = TypeVar('T')
+
+    class Related(GenericModel, Generic[T]):
+        a: T
+
+    class Parent(GenericModel, Generic[T]):
+        a: Optional[List[Union[Related[T], str]]]
+
+    class Child(Parent[T], Generic[T]):
+        pass
+
+    assert Child[int].__concrete__ is True
+    assert Child.__concrete__ is False
+
+    with pytest.raises(ValidationError):
+        Child[int](a=['s', {'a': 'wrong'}])
+    assert Child[int](a=['s', {'a': 1}]).a[1].a == 1
+
+    assert Child[int].__fields__['a'].sub_fields[0].sub_fields[0].type_ is Related[int]
