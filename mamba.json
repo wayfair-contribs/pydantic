@@ -1,0 +1,27 @@
+{
+    "project_guid": "ca06ac58-403f-4a71-9486-a3440734beeb",
+    "answers": {
+        "user_sam_account_name": "ch438l",
+        "default_business_reviewer": "ch438l",
+        "project_name": "mep-pydantic",
+        "project_description": "A fork of pydantic with an urgent bug fix",
+        "owner": "Analytic Systems",
+        "owner_email": "analyticsystems@wayfair.com",
+        "repo_name": "mep-pydantic",
+        "entire_workgroup_owners": false,
+        "jira_project": "ASE",
+        "package_distribution_name": "mep-pydantic",
+        "package_import_name": "pydantic",
+        "package_version": "1.6.1",
+        "support_classifier_37": true,
+        "support_classifier_36": false,
+        "uses_pandas_numpy": false
+    },
+    "generated_at": "2020-10-12 21:58:14.531236+00:00",
+    "template_sha": "9dbc066c012b6783bdd5f2b9e62f4467f34ccbe4",
+    "template_repo_namespace": "shared",
+    "template_repo_name": "python-platforms-project-templates",
+    "template_name": "python-package",
+    "template_repo_url": "https://github.csnzoo.com/shared/python-platforms-project-templates",
+    "template_branch": "master"
+}

@@ -1,0 +1,12 @@
+# use wheelhaus to distribute the wheel
+
+- label: ":rocket: Release wheel"
+  plugins:
+    ssh://git@github.csnzoo.com/shared/wheelhaus-buildkite-plugin#v0.2.0:
+      upload: "wheel"
+
+# use wheelhaus to distribute the sdist
+- label: ":rocket: Release sdist"
+  plugins:
+    ssh://git@github.csnzoo.com/shared/wheelhaus-buildkite-plugin#v0.2.0:
+      upload: "sdist"

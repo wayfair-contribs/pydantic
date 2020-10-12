@@ -1,0 +1,15 @@
+# This file sets up building an sdist (Source Distribution) and a wheel for your Project
+
+# sdists are convenient to be able to rebuild the package later
+- label: ":hammer: Build sdist"
+  plugins:
+    - ssh://git@github.csnzoo.com/shared/python-build-buildkite-plugin.git#v0.2.1:
+        dist-type: "sdist"
+  agents: "queue=docker"
+
+#  wheels are medieval, but wheels work.
+- label: ":hammer: Build wheel"
+  plugins:
+    - ssh://git@github.csnzoo.com/shared/python-build-buildkite-plugin.git#v0.2.1:
+        dist-type: "wheel"
+  agents: "queue=docker"

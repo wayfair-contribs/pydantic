@@ -1,0 +1,7 @@
+- label: "Build docs :notebook:"
+  plugins:
+    - ssh://git@github.csnzoo.com/shared/mkdocs-buildkite-plugin#v0.10.0:
+        copy_readme: true
+        prod_build_branch: "main"
+  agents:
+    queue: "mkdocs"

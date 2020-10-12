@@ -1,0 +1,24 @@
+version: "3.4"
+services:
+
+  # "devbox" to enable the developer to have a fully loaded development environment
+  devbox: &devbox
+    build:
+      dockerfile: "./docker/devbox.dockerfile"
+      context: "."
+      args:
+       BASE_OS: "centos75"
+       DOCKER_PYTHON_VERSION: "python38"
+       PYTHON_VERSION: "3.8.5"
+       DOCKER_BASE_RELEASE_DATE: "2020.09.03"
+       PROJECT_NAME: "mep-pydantic"
+    image: "wayfair/mep-pydantic-devbox"
+    volumes:
+      - "./:/app"
+      - "./docker/files/wf-config.ini:/wayfair/etc/wf-config.ini"
+
+
+  test:
+    <<: *devbox
+    command: "test --all"
+    entrypoint: "docker/entrypoints/entrypoint.sh"

@@ -1,0 +1,8 @@
+.docker-options: &docker-options
+  propagate-environment: true
+  copy-checkout: true
+
+.python3-container: &python3-container
+  ssh://git@github.csnzoo.com/secure/docker-buildkite-plugin#v3.2.7:
+    image: "artifactory.service.bo1.csnzoo.com/wayfair/python/centos75-python38:3.8.5-2020.09.03"
+    <<: *docker-options

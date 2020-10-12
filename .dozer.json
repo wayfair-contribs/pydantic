@@ -1,0 +1,6 @@
+{
+    "version": "0.2.0",
+    "dependency_configs": {
+        "buildkite-plugin": {}
+    }
+}
