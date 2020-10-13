@@ -5,7 +5,7 @@ from typing import Any, ClassVar, Dict, Generic, List, Optional, Tuple, Type, Ty
 import pytest
 
 from pydantic import BaseModel, Field, ValidationError, root_validator, validator
-from pydantic.generics import GenericModel, _generic_types_cache, _is_typevar
+from pydantic.generics import GenericModel, _generic_types_cache, _has_typevar
 
 skip_36 = pytest.mark.skipif(sys.version_info < (3, 7), reason='generics only supported for python 3.7 and above')
 
@@ -602,15 +602,15 @@ def test_multiple_specification():
 
 
 @skip_36
-def test_is_typevar():
+def test_has_typevar():
     T = TypeVar('T')
 
     class Model(GenericModel, Generic[T]):
         a: T
 
-    assert _is_typevar(Model[T])
-    assert _is_typevar(Optional[List[Union[str, Model[T]]]])
-    assert not _is_typevar(Optional[List[Union[str, Model[int]]]])
+    assert _has_typevar(Model[T])
+    assert _has_typevar(Optional[List[Union[str, Model[T]]]])
+    assert not _has_typevar(Optional[List[Union[str, Model[int]]]])
 
 
 @skip_36
@@ -646,4 +646,14 @@ def test_inner_types():
         Child[int](a=['s', {'a': 'wrong'}])
     assert Child[int](a=['s', {'a': 1}]).a[1].a == 1
 
-    assert Child[int].__fields__['a'].sub_fields[0].sub_fields[0].type_ is Related[int]
+    assert Child[int].__fields__['a'].outer_type_ == List[Union[Related[int], str]]
+    assert (
+        Child[int].__fields__['a']
+        .sub_fields[0]
+        .sub_fields[0]
+        .outer_type_
+        .__fields__['a']
+        .outer_type_
+     ) == int
+
+

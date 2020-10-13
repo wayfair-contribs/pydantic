@@ -62,10 +62,10 @@ class GenericModel(BaseModel):
             ),
         )
         created_model.Config = cls.Config
-        concrete = all(not _is_typevar(v) for v in concrete_type_hints.values())
+        concrete = all(not _has_typevar(v) for v in concrete_type_hints.values())
         created_model.__concrete__ = concrete
         if not concrete:
-            parameters = tuple(v for v in concrete_type_hints.values() if _is_typevar(v))
+            parameters = tuple(v for v in concrete_type_hints.values() if _has_typevar(v))
             parameters = tuple({k: None for k in parameters}.keys())  # get unique params while maintaining order
             created_model.__parameters__ = parameters
         _generic_types_cache[(cls, params)] = created_model
@@ -122,11 +122,11 @@ def _parameterize_generic_field(field_type: Type[Any], typevars_map: Dict[TypeVa
     return field_type
 
 
-def _is_typevar(v: Any) -> bool:
+def _has_typevar(v: Any) -> bool:
     if lenient_issubclass(v, GenericModel):
         return not v.__concrete__
     args = _get_args(v)
-    if args and any(_is_typevar(arg) for arg in args):
+    if args and any(_has_typevar(arg) for arg in args):
         return True
     return isinstance(v, TypeVar)  # type: ignore
 
