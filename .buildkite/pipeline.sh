@@ -53,37 +53,10 @@ echo
 
 echo "steps:"
 
-# unless SKIP_TEST, run your tests. you do have tests, right?  :D
-if [[ ! "${SKIP_TEST:-}" == "true" ]] ; then
-    add_steps .buildkite/test.yml
-fi
-
-# The trigger to build and deploy via wheelhaus is the push of a Git Tag
-if [[ "${BUILDKITE_TAG:-}" ]]; then
-    BUILD_DEPLOY="true"
-fi
-
 # if there was a git tag pushed, build an sdist and wheel and deploy
-if [[ "${BUILD_DEPLOY:-}" == "true" ]] ; then
-    echo "  - wait"
 
-    add_steps .buildkite/build.yml
+add_steps .buildkite/build.yml
 
-    echo "  - wait"
+echo "  - wait"
 
-    add_steps .buildkite/deploy.yml
-fi
-
-# Allow for overriding and testing the build pipeline, but skip deploying
-if [[ "${TEST_BUILD:-}" == "true" ]] ; then
-    echo "  - wait"
-
-    add_steps .buildkite/build.yml
-fi
-
-# Allow for overriding and testing the deploy to test WHS
-if [[ "${TEST_DEPLOY:-}" == "true" ]] ; then
-    echo "  - wait"
-
-    add_steps .buildkite/deploy.yml
-fi
+add_steps .buildkite/deploy.yml
