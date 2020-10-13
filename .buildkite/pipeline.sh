@@ -53,16 +53,6 @@ echo
 
 echo "steps:"
 
-# unless SKIP_DOCS, generate the docs site
-if [[ ! "${SKIP_DOCS:-}" == "true" ]] ; then
-    add_steps .buildkite/docs.yml
-fi
-
-# unless SKIP_LINT, include the basic pipeline steps - lint, flake, etc.
-if [[ ! "${SKIP_LINT:-}" == "true" ]] ; then
-    add_steps .buildkite/lint.yml
-fi
-
 # unless SKIP_TEST, run your tests. you do have tests, right?  :D
 if [[ ! "${SKIP_TEST:-}" == "true" ]] ; then
     add_steps .buildkite/test.yml
