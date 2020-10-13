@@ -5,7 +5,7 @@ from typing import Any, ClassVar, Dict, Generic, List, Optional, Tuple, Type, Ty
 import pytest
 
 from pydantic import BaseModel, Field, ValidationError, root_validator, validator
-from pydantic.generics import GenericModel, _generic_types_cache
+from pydantic.generics import GenericModel, _generic_types_cache, _has_typevar
 
 skip_36 = pytest.mark.skipif(sys.version_info < (3, 7), reason='generics only supported for python 3.7 and above')
 
@@ -246,35 +246,6 @@ def test_generic_config():
     assert result.data == 1
     with pytest.raises(TypeError):
         result.data = 2
-
-
-@skip_36
-def test_deep_generic():
-    T = TypeVar('T')
-    S = TypeVar('S')
-    R = TypeVar('R')
-
-    class OuterModel(GenericModel, Generic[T, S, R]):
-        a: Dict[R, Optional[List[T]]]
-        b: Optional[Union[S, R]]
-        c: R
-        d: float
-
-    class InnerModel(GenericModel, Generic[T, R]):
-        c: T
-        d: R
-
-    class NormalModel(BaseModel):
-        e: int
-        f: str
-
-    inner_model = InnerModel[int, str]
-    generic_model = OuterModel[inner_model, NormalModel, int]
-
-    inner_models = [inner_model(c=1, d='a')]
-    generic_model(a={1: inner_models, 2: None}, b=None, c=1, d=1.5)
-    generic_model(a={}, b=NormalModel(e=1, f='a'), c=1, d=1.5)
-    generic_model(a={}, b=1, c=1, d=1.5)
 
 
 @skip_36
@@ -599,3 +570,169 @@ def test_multiple_specification():
         {'loc': ('a',), 'msg': 'none is not an allowed value', 'type': 'type_error.none.not_allowed'},
         {'loc': ('b',), 'msg': 'none is not an allowed value', 'type': 'type_error.none.not_allowed'},
     ]
+
+
+@skip_36
+def test_has_typevar():
+    T = TypeVar('T')
+
+    class Model(GenericModel, Generic[T]):
+        a: T
+
+    assert _has_typevar(Model[T])
+    assert _has_typevar(Optional[List[Union[str, Model[T]]]])
+    assert not _has_typevar(Optional[List[Union[str, Model[int]]]])
+
+
+@skip_36
+def test_nested_identity_parameterization():
+    T = TypeVar('T')
+    T2 = TypeVar('T2')
+
+    class Model(GenericModel, Generic[T]):
+        a: T
+
+    assert Model[T][T][T] is Model
+    assert Model[T] is Model
+    assert Model[T2] is not Model
+
+
+@skip_36
+def test_deep_generic():
+    T = TypeVar('T')
+    S = TypeVar('S')
+    R = TypeVar('R')
+
+    class OuterModel(GenericModel, Generic[T, S, R]):
+        a: Dict[R, Optional[List[T]]]
+        b: Optional[Union[S, R]]
+        c: R
+        d: float
+
+    class InnerModel(GenericModel, Generic[T, R]):
+        c: T
+        d: R
+
+    class NormalModel(BaseModel):
+        e: int
+        f: str
+
+    inner_model = InnerModel[int, str]
+    generic_model = OuterModel[inner_model, NormalModel, int]
+
+    inner_models = [inner_model(c=1, d='a')]
+    generic_model(a={1: inner_models, 2: None}, b=None, c=1, d=1.5)
+    generic_model(a={}, b=NormalModel(e=1, f='a'), c=1, d=1.5)
+    generic_model(a={}, b=1, c=1, d=1.5)
+
+    assert InnerModel.__concrete__ is False
+    assert inner_model.__concrete__ is True
+
+
+@skip_36
+def test_deep_generic_with_inner_typevar():
+    T = TypeVar('T')
+
+    class OuterModel(GenericModel, Generic[T]):
+        a: List[T]
+
+    class InnerModel(OuterModel[T], Generic[T]):
+        pass
+
+    assert InnerModel[int].__concrete__ is True
+    assert InnerModel.__concrete__ is False
+
+    with pytest.raises(ValidationError):
+        InnerModel[int](a=['wrong'])
+    assert InnerModel[int](a=['1']).a == [1]
+
+
+@skip_36
+def test_deep_generic_with_referenced_generic():
+    T = TypeVar('T')
+    R = TypeVar('R')
+
+    class ReferencedModel(GenericModel, Generic[R]):
+        a: R
+
+    class OuterModel(GenericModel, Generic[T]):
+        a: ReferencedModel[T]
+
+    class InnerModel(OuterModel[T], Generic[T]):
+        pass
+
+    assert InnerModel[int].__concrete__ is True
+    assert InnerModel.__concrete__ is False
+
+    with pytest.raises(ValidationError):
+        InnerModel[int](a={'a': 'wrong'})
+    assert InnerModel[int](a={'a': 1}).a.a == 1
+
+
+@skip_36
+def test_deep_generic_with_referenced_inner_generic():
+    T = TypeVar('T')
+
+    class ReferencedModel(GenericModel, Generic[T]):
+        a: T
+
+    class OuterModel(GenericModel, Generic[T]):
+        a: Optional[List[Union[ReferencedModel[T], str]]]
+
+    class InnerModel(OuterModel[T], Generic[T]):
+        pass
+
+    assert InnerModel[int].__concrete__ is True
+    assert InnerModel.__concrete__ is False
+
+    with pytest.raises(ValidationError):
+        InnerModel[int](a=['s', {'a': 'wrong'}])
+    assert InnerModel[int](a=['s', {'a': 1}]).a[1].a == 1
+
+    assert InnerModel[int].__fields__['a'].outer_type_ == List[Union[ReferencedModel[int], str]]
+    assert (InnerModel[int].__fields__['a'].sub_fields[0].sub_fields[0].outer_type_.__fields__['a'].outer_type_) == int
+
+
+@skip_36
+def test_deep_generic_with_multiple_typevars():
+    T = TypeVar('T')
+    U = TypeVar('U')
+
+    class OuterModel(GenericModel, Generic[T]):
+        data: List[T]
+
+    class InnerModel(OuterModel[T], Generic[U, T]):
+        extra: U
+
+    ConcreteInnerModel = InnerModel[int, float]
+    assert ConcreteInnerModel.__fields__['data'].outer_type_ == List[float]
+    assert ConcreteInnerModel.__fields__['extra'].outer_type_ == int
+
+    assert ConcreteInnerModel(data=['1'], extra='2').dict() == {'data': [1.0], 'extra': 2}
+
+
+@skip_36
+def test_deep_generic_with_multiple_inheritance():
+    K = TypeVar('K')
+    V = TypeVar('V')
+    T = TypeVar('T')
+
+    class OuterModelA(GenericModel, Generic[K, V]):
+        data: Dict[K, V]
+
+    class OuterModelB(GenericModel, Generic[T]):
+        stuff: List[T]
+
+    class InnerModel(OuterModelA[K, V], OuterModelB[T], Generic[K, V, T]):
+        extra: int
+
+    ConcreteInnerModel = InnerModel[int, float, str]
+    assert ConcreteInnerModel.__fields__['data'].outer_type_ == Dict[int, float]
+    assert ConcreteInnerModel.__fields__['stuff'].outer_type_ == List[str]
+    assert ConcreteInnerModel.__fields__['extra'].outer_type_ == int
+
+    ConcreteInnerModel(data={1.1: '5'}, stuff=[123], extra=5).dict() == {
+        'data': {1: 5},
+        'stuff': ['123'],
+        'extra': 5,
+    }
