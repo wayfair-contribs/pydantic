@@ -1,6 +1,6 @@
 import collections
 import typing
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Tuple, Type, TypeVar, Union, cast, get_type_hints
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, Tuple, Type, TypeVar, Union, cast, get_type_hints
 
 from .class_validators import gather_all_validators
 from .fields import FieldInfo, ModelField
@@ -10,7 +10,6 @@ from .utils import lenient_issubclass
 _generic_types_cache: Dict[Tuple[Type[Any], Union[Any, Tuple[Any, ...]]], Type[BaseModel]] = {}
 GenericModelT = TypeVar('GenericModelT', bound='GenericModel')
 TypeVarType = Any  # since mypy doesn't allow the use of TypeVar as a type
-_builtin_type_map = {list: List, tuple: Tuple, dict: Dict}
 
 
 class GenericModel(BaseModel):
@@ -87,12 +86,23 @@ def resolve_type_hint(type_: Any, typevars_map: Dict[Any, Any]) -> Type[Any]:
     type_args = _get_args(type_)
     if type_args:
         concrete_type_args = tuple(resolve_type_hint(arg, typevars_map) for arg in type_args)
-        origin_type = _get_origin(type_) or type_
-        origin_type = _builtin_type_map.get(origin_type, origin_type)
-        if origin_type is type:
-            return type_[concrete_type_args]
-        else:
-            return origin_type[concrete_type_args]
+        origin_type = _get_origin(type_)
+        if origin_type is not None:
+            try:
+                return origin_type[concrete_type_args]
+            except TypeError:
+                pass
+            try:
+                # finally try to get origin directly from typing module
+                # in particular this can happen for python < 3.9 where the origin
+                # is a builtin type, see https://www.python.org/dev/peps/pep-0585
+                origin_type = getattr(typing, type_._name)
+                return origin_type[concrete_type_args]
+            except (TypeError, AttributeError):
+                pass
+        # this should not be reached
+        raise TypeError(f'Could not resolve type origin: {type_}')  # pragma: no cover
+
     if lenient_issubclass(type_, GenericModel) and not type_.__concrete__:
         return type_[tuple(resolve_type_hint(t, typevars_map) for t in type_.__parameters__)]
     return typevars_map.get(type_, type_)

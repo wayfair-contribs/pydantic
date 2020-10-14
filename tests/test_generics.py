@@ -1,7 +1,7 @@
 import abc
 import sys
 from enum import Enum
-from typing import Any, ClassVar, Dict, Generic, List, Optional, Tuple, Type, TypeVar, Union
+from typing import Any, ClassVar, Dict, Generic, List, Optional, Sequence, Tuple, Type, TypeVar, Union
 
 import pytest
 
@@ -764,3 +764,34 @@ def test_deep_generic_with_multiple_inheritance():
         'stuff': ['123'],
         'extra': 5,
     }
+
+
+@skip_36
+def test_generic_with_generic_type_1():
+    T = TypeVar('T')
+
+    class ModelWithType(GenericModel, Generic[T]):
+        # Type resolves to type origin of "type" which is non-subscriptible for
+        # python < 3.9 so we want to make sure it works for other versions
+        some_type: Type[T]
+
+    class ReferenceModel(GenericModel, Generic[T]):
+        abstract_base_with_type: ModelWithType[T]
+
+    ReferenceModel[int]
+
+
+@skip_36
+def test_generic_with_generic_type_2():
+    T = TypeVar('T')
+
+    class ModelWithType(GenericModel, Generic[T]):
+        # Type resolves to type origin of "collections.abc.Sequence" which is
+        # non-subscriptible for
+        # python < 3.9 so we want to make sure it works for other versions
+        some_type: Sequence[T]
+
+    class ReferenceModel(GenericModel, Generic[T]):
+        abstract_base_with_type: ModelWithType[T]
+
+    ReferenceModel[int]
