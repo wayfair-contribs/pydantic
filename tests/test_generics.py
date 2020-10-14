@@ -740,6 +740,29 @@ def test_generic_subclass_of_concrete_generic():
 
 
 @skip_36
+def test_abstract_generic_type_recursion():
+    T = TypeVar('T')
+
+    class BaseInnerClass(GenericModel, abc.ABC, Generic[T]):
+        base_data: T
+
+        @abc.abstractmethod
+        def base_abstract(self) -> None:
+            pass
+
+    class ConcreteInnerClass(BaseInnerClass[T], Generic[T]):
+
+        def base_abstract(self) -> None:
+            return None
+
+    class OuterClass(GenericModel, Generic[T]):
+        inner_class: BaseInnerClass[T]
+
+    OuterClass[int](inner_class=ConcreteInnerClass[int](base_data=2))
+
+
+
+@skip_36
 def test_deep_generic_with_multiple_inheritance():
     K = TypeVar('K')
     V = TypeVar('V')
