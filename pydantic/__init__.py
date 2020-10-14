@@ -13,7 +13,7 @@ from .tools import *
 from .types import *
 from .version import VERSION
 
-__version__ = "1.6.1.dev3"
+__version__ = "1.6.1.dev4"
 
 # WARNING __all__ from .errors is not included here, it will be removed as an export here in v2
 # please use "from pydantic.errors import ..." instead
