@@ -739,29 +739,6 @@ def test_generic_subclass_of_concrete_generic():
     GenericSub[str]
 
 
-@skip_36
-def test_abstract_generic_type_recursion():
-    T = TypeVar('T')
-
-    class BaseInnerClass(GenericModel, abc.ABC, Generic[T]):
-        base_data: T
-
-        @abc.abstractmethod
-        def base_abstract(self) -> None:
-            pass
-
-    class ConcreteInnerClass(BaseInnerClass[T], Generic[T]):
-
-        def base_abstract(self) -> None:
-            return None
-
-    class OuterClass(GenericModel, Generic[T]):
-        inner_class: BaseInnerClass[T]
-
-    OuterClass[int](inner_class=ConcreteInnerClass[int](base_data=2))
-    OuterClass(inner_class=ConcreteInnerClass(base_data=2))
-
-
 
 @skip_36
 def test_deep_generic_with_multiple_inheritance():
@@ -819,3 +796,28 @@ def test_generic_with_generic_type_2():
         abstract_base_with_type: ModelWithType[T]
 
     ReferenceModel[int]
+
+
+@skip_36
+def test_abstract_generic_type_recursion():
+    T = TypeVar('T')
+
+    class BaseInnerClass(GenericModel, abc.ABC, Generic[T]):
+        base_data: T
+
+        @abc.abstractmethod
+        def base_abstract(self) -> None:
+            pass
+
+    class ConcreteInnerClass(BaseInnerClass[T], Generic[T]):
+
+        def base_abstract(self) -> None:
+            return None
+
+    class OuterClass(GenericModel, Generic[T]):
+        inner_class: BaseInnerClass[T]
+
+    OuterClass[int](inner_class=ConcreteInnerClass[int](base_data=2))
+    OuterClass(inner_class=ConcreteInnerClass(base_data=2))
+    with pytest.raises(ValidationError):
+        OuterClass[int](inner_class=ConcreteInnerClass[str](base_data='wrong'))
