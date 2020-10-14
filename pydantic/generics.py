@@ -89,7 +89,10 @@ def resolve_type_hint(type_: Any, typevars_map: Dict[Any, Any]) -> Type[Any]:
         concrete_type_args = tuple(resolve_type_hint(arg, typevars_map) for arg in type_args)
         origin_type = _get_origin(type_) or type_
         origin_type = _builtin_type_map.get(origin_type, origin_type)
-        return origin_type[concrete_type_args]
+        if origin_type is type:
+            return type_[concrete_type_args]
+        else:
+            return origin_type[concrete_type_args]
     if lenient_issubclass(type_, GenericModel) and not type_.__concrete__:
         return type_[tuple(resolve_type_hint(t, typevars_map) for t in type_.__parameters__)]
     return typevars_map.get(type_, type_)

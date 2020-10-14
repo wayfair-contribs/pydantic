@@ -713,20 +713,16 @@ def test_deep_generic_with_multiple_typevars():
 
 
 @skip_36
-def test_generic_with_wierd_edge_case():
+def test_generic_with_generic_type():
     T = TypeVar('T')
 
-    class AbstractBaseWithType(GenericModel, abc.ABC, Generic[T]):
+    class ModelWithType(GenericModel, Generic[T]):
         some_type: Type[T]
 
-    class SomeOtherBaseAbstractBase(GenericModel, abc.ABC, Generic[T]):
-        pass
+    class ReferenceModel(GenericModel, Generic[T]):
+        abstract_base_with_type: ModelWithType[T]
 
-    class ConcreteClassOfSomeOther(SomeOtherBaseAbstractBase[T], Generic[T]):
-        abstract_base_with_type: AbstractBaseWithType[T]
-
-    ConcreteSomeOther = ConcreteClassOfSomeOther[int]
-
+    ReferenceModel[int]
 
 
 @skip_36
