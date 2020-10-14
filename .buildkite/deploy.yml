@@ -1,4 +1,5 @@
 # use wheelhaus to distribute the wheel
+- block: ":rocket: Release?"
 
 - label: ":rocket: Release wheel"
   plugins:
