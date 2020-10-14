@@ -1,3 +1,4 @@
+import abc
 import sys
 from enum import Enum
 from typing import Any, ClassVar, Dict, Generic, List, Optional, Tuple, Type, TypeVar, Union
@@ -709,6 +710,23 @@ def test_deep_generic_with_multiple_typevars():
     assert ConcreteInnerModel.__fields__['extra'].outer_type_ == int
 
     assert ConcreteInnerModel(data=['1'], extra='2').dict() == {'data': [1.0], 'extra': 2}
+
+
+@skip_36
+def test_generic_with_wierd_edge_case():
+    T = TypeVar('T')
+
+    class AbstractBaseWithType(GenericModel, abc.ABC, Generic[T]):
+        some_type: Type[T]
+
+    class SomeOtherBaseAbstractBase(GenericModel, abc.ABC, Generic[T]):
+        pass
+
+    class ConcreteClassOfSomeOther(SomeOtherBaseAbstractBase[T], Generic[T]):
+        abstract_base_with_type: AbstractBaseWithType[T]
+
+    ConcreteSomeOther = ConcreteClassOfSomeOther[int]
+
 
 
 @skip_36
