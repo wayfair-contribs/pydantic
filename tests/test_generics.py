@@ -726,6 +726,20 @@ def test_generic_with_generic_type():
 
 
 @skip_36
+def test_generic_subclass_of_concrete_generic():
+    T = TypeVar("T")
+    U = TypeVar("U")
+
+    class GenericBaseModel(GenericModel, Generic[T]):
+        data: T
+
+    class GenericSub(GenericBaseModel[int], Generic[U]):
+        extra: U
+
+    GenericSub[str]
+
+
+@skip_36
 def test_deep_generic_with_multiple_inheritance():
     K = TypeVar('K')
     V = TypeVar('V')
