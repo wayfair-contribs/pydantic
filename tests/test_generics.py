@@ -1,7 +1,8 @@
 import abc
 import sys
 from enum import Enum
-from typing import Any, ClassVar, Dict, Generic, List, Optional, Sequence, Tuple, Type, TypeVar, Union
+from typing import Any, ClassVar, Dict, Generic, List, Optional, Sequence, Tuple, Type, TypeVar, Union, \
+    Callable
 
 import pytest
 
@@ -819,3 +820,62 @@ def test_abstract_generic_type_recursion():
 
     OuterClass[int](inner_class=ConcreteInnerClass[int](base_data=2))
     OuterClass(inner_class=ConcreteInnerClass(base_data=2))
+
+
+@skip_36
+def test_generic_partial_recursive():
+    T = TypeVar('T')
+    U = TypeVar('U')
+
+    class VeryInnerModel(GenericModel, Generic[T, U]):
+        t: T
+        u: U
+        some_callable: Callable[[Optional[int], str], None]
+
+    class InnerModel(GenericModel, Generic[T, U]):
+        very_inner: VeryInnerModel[T, U]
+
+    class OuterModelBase(GenericModel, abc.ABC, Generic[U]):
+        pass
+
+    class OuterModel(OuterModelBase[U], Generic[U]):
+        inner_model: InnerModel[str, U]
+
+    OuterModel[int]
+
+@skip_36
+def test_generic_with_callable():
+    T = TypeVar('T')
+    U = TypeVar('U')
+
+    class GenericModelWithCallable(GenericModel, Generic[T, U]):
+        t: T
+        some_callable: Callable[[U, str], None]
+
+    ConcreteModel = GenericModelWithCallable[int, str]
+    assert ConcreteModel.__concrete__ is True
+    PartialModel = GenericModelWithCallable[int, U]
+    assert PartialModel.__concrete__ is False
+    assert PartialModel[int].__concrete__ is True
+
+
+@skip_36
+def test_nested_with_partial():
+    T = TypeVar('T')
+    U = TypeVar('U')
+
+    class Model(GenericModel, Generic[T, U]):
+        t: List[T]
+        u: List[U]
+
+    alias = Model[int, U]
+    assert alias.__concrete__ is False
+    concrete = alias[int]
+    assert concrete.__concrete__ is True
+    partial_recursive_alias = Model[List[T], int]
+    assert partial_recursive_alias.__concrete__ is False
+    concrete_recursive = partial_recursive_alias[int]
+    assert concrete_recursive.__concrete__ is True
+
+
+

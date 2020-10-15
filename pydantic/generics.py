@@ -1,6 +1,6 @@
 import collections
 import typing
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, Tuple, Type, TypeVar, Union, cast, get_type_hints
+from typing import TYPE_CHECKING, Any, ClassVar, Dict, Iterator, Tuple, Type, TypeVar, Union, cast, get_type_hints
 
 from .class_validators import gather_all_validators
 from .fields import FieldInfo, ModelField
@@ -64,9 +64,7 @@ class GenericModel(BaseModel):
         concrete = all(not _has_typevar(v) for v in concrete_type_hints.values())
         created_model.__concrete__ = concrete
         if not concrete:
-            parameters = tuple(v for v in concrete_type_hints.values() if _has_typevar(v))
-            parameters = tuple({k: None for k in parameters}.keys())  # get unique params while maintaining order
-            created_model.__parameters__ = parameters
+            created_model.__parameters__ = extract_parameters(typevars_map)
         _generic_types_cache[(cls, params)] = created_model
         if len(params) == 1:
             _generic_types_cache[(cls, params[0])] = created_model
@@ -85,6 +83,25 @@ class GenericModel(BaseModel):
     def validate(cls: Type[GenericModelT], value: Any) -> GenericModelT:
         actual_cls = cls.__base__
         return super(GenericModel, actual_cls).validate(value)
+
+
+def extract_parameters(typevars_map: Dict[Any, Any]) -> Tuple[TypeVarType, ...]:
+    extracted_parameters = {param: None for param in generate_parameters(list(typevars_map.values()))}
+    return tuple(extracted_parameters)
+
+
+def generate_parameters(v: Any) -> Iterator[TypeVarType]:
+    if isinstance(v, TypeVar):
+        yield v
+    elif lenient_issubclass(v, GenericModel):
+        yield from v.__parameters__
+    elif isinstance(v, list):
+        for var in v:
+            yield from generate_parameters(var)
+    else:
+        args = _get_args(v)
+        for arg in args:
+            yield from generate_parameters(arg)
 
 
 def resolve_type_hint(type_: Any, typevars_map: Dict[Any, Any]) -> Type[Any]:
@@ -110,6 +127,8 @@ def resolve_type_hint(type_: Any, typevars_map: Dict[Any, Any]) -> Type[Any]:
 
     if lenient_issubclass(type_, GenericModel) and not type_.__concrete__:
         return type_[tuple(resolve_type_hint(t, typevars_map) for t in type_.__parameters__)]
+    if isinstance(type_, list):
+        return [resolve_type_hint(element, typevars_map) for element in type_]
     return typevars_map.get(type_, type_)
 
 
@@ -143,6 +162,8 @@ def _parameterize_generic_field(field_type: Type[Any], typevars_map: Dict[TypeVa
 def _has_typevar(v: Any) -> bool:
     if lenient_issubclass(v, GenericModel):
         return not v.__concrete__
+    if isinstance(v, list):
+        return any(_has_typevar(element) for element in v)
     args = _get_args(v)
     if args and any(_has_typevar(arg) for arg in args):
         return True
