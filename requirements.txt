@@ -1,24 +1,7 @@
-# benchmark requirements are skipped here since they're rarely required
-# -r benchmarks/requirements.txt
-
-# Docs Requirements
-# -r docs/requirements.txt
-ansi2html==1.5.2
-mkdocs==1.1.2
-markdown==3.3
-mkdocs-exclude==1.0.2
-mkdocs-material==6.0.2
-markdown-include==0.6.0
-pygments==2.7.1
-sqlalchemy   # pyup: ignore
-orjson       # pyup: ignore
-ujson        # pyup: ignore
-
-
-# -r tests/requirements.txt
+# requirements for compilation and from setup.py so dependabot prompts us to test with latest version of these packages
 
 Cython==0.29.21;sys_platform!='win32'
-devtools==0.6.0
+devtools==0.6.1
 email-validator==1.1.1
 dataclasses==0.6; python_version < '3.7'
 typing-extensions==3.7.4.1; python_version < '3.8'

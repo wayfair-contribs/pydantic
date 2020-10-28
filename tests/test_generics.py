@@ -7,7 +7,7 @@ from typing import Any, ClassVar, Dict, Generic, List, Optional, Sequence, Tuple
 import pytest
 
 from pydantic import BaseModel, Field, ValidationError, root_validator, validator
-from pydantic.generics import GenericModel, _generic_types_cache, _has_typevar
+from pydantic.generics import GenericModel, _generic_types_cache, _has_typevar, get_caller_module_name
 
 skip_36 = pytest.mark.skipif(sys.version_info < (3, 7), reason='generics only supported for python 3.7 and above')
 
@@ -385,7 +385,6 @@ def test_custom_schema():
 
 @skip_36
 def test_child_schema():
-
     T = TypeVar('T')
 
     class Model(GenericModel, Generic[T]):
@@ -572,6 +571,186 @@ def test_multiple_specification():
         {'loc': ('a',), 'msg': 'none is not an allowed value', 'type': 'type_error.none.not_allowed'},
         {'loc': ('b',), 'msg': 'none is not an allowed value', 'type': 'type_error.none.not_allowed'},
     ]
+
+
+@skip_36
+def test_generic_subclass_of_concrete_generic():
+    T = TypeVar('T')
+    U = TypeVar('U')
+
+    class GenericBaseModel(GenericModel, Generic[T]):
+        data: T
+
+    class GenericSub(GenericBaseModel[int], Generic[U]):
+        extra: U
+
+    ConcreteSub = GenericSub[int]
+
+    with pytest.raises(ValidationError):
+        ConcreteSub(data=2, extra='wrong')
+
+    with pytest.raises(ValidationError):
+        ConcreteSub(data='wrong', extra=2)
+
+    ConcreteSub(data=2, extra=3)
+
+
+@skip_36
+def test_generic_model_pickle(create_module):
+    # Using create_module because pickle doesn't support
+    # objects with <locals> in their __qualname__  (e. g. defined in function)
+    @create_module
+    def module():
+        import pickle
+        from typing import Generic, TypeVar
+
+        from pydantic import BaseModel
+        from pydantic.generics import GenericModel
+
+        t = TypeVar('t')
+
+        class Model(BaseModel):
+            a: float
+            b: int = 10
+
+        class MyGeneric(GenericModel, Generic[t]):
+            value: t
+
+        original = MyGeneric[Model](value=Model(a='24'))
+        dumped = pickle.dumps(original)
+        loaded = pickle.loads(dumped)
+        assert loaded.value.a == original.value.a == 24
+        assert loaded.value.b == original.value.b == 10
+        assert loaded == original
+
+
+@skip_36
+def test_generic_model_from_function_pickle_fail(create_module):
+    @create_module
+    def module():
+        import pickle
+        from typing import Generic, TypeVar
+
+        import pytest
+
+        from pydantic import BaseModel
+        from pydantic.generics import GenericModel
+
+        t = TypeVar('t')
+
+        class Model(BaseModel):
+            a: float
+            b: int = 10
+
+        class MyGeneric(GenericModel, Generic[t]):
+            value: t
+
+        def get_generic(t):
+            return MyGeneric[t]
+
+        original = get_generic(Model)(value=Model(a='24'))
+        with pytest.raises(pickle.PicklingError):
+            pickle.dumps(original)
+
+
+@skip_36
+def test_generic_model_redefined_without_cache_fail(create_module):
+    @create_module
+    def module():
+        from typing import Generic, TypeVar
+
+        import pytest
+
+        from pydantic.generics import GenericModel, _generic_types_cache
+
+        t = TypeVar('t')
+
+        class MyGeneric(GenericModel, Generic[t]):
+            value: t
+
+        concrete = MyGeneric[t]
+        _generic_types_cache.clear()
+        with pytest.raises(
+            TypeError, match=r"'MyGeneric\[t\]' already defined above, please consider reusing it"
+        ) as exc_info:
+            MyGeneric[t]
+
+        cause = exc_info.value.__cause__
+        assert isinstance(cause, NameError), cause
+        expected_message = f"Name conflict: 'MyGeneric[t]' in {__name__!r} is already used by {concrete!r}"
+        assert cause.args[0] == expected_message, f'{cause.args[0]} != {expected_message}'
+
+
+def test_get_caller_module_name(create_module):
+    @create_module
+    def module():
+        from pydantic.generics import get_caller_module_name
+
+        def get_current_module_name():
+            return get_caller_module_name()
+
+        assert get_current_module_name() == __name__
+
+
+def test_get_caller_module_name_not_found(mocker):
+    mocker.patch('inspect.getmodule', return_value=None)
+    assert get_caller_module_name() is None
+
+
+def test_is_call_from_module(create_module):
+    @create_module
+    def module():
+        from pydantic.generics import is_call_from_module
+
+        def function():
+            assert is_call_from_module()
+
+            another_function()
+
+        def another_function():
+            assert not is_call_from_module()
+            third_function()
+
+        def third_function():
+            assert not is_call_from_module()
+
+        function()
+
+
+def test_is_call_from_module_called_in_module(create_module):
+    @create_module
+    def module():
+        from unittest.mock import patch
+
+        import pytest
+
+        from pydantic.generics import is_call_from_module
+
+        with pytest.raises(RuntimeError, match='This function must be used inside another function') as exc_info:
+            with patch('inspect.stack', new=lambda: [..., ...]):
+                is_call_from_module()
+
+        e = exc_info.value
+        assert isinstance(e.__cause__, IndexError)
+        assert isinstance(e.__context__, IndexError)
+
+
+def test_get_caller_module_called_from_module(create_module):
+    @create_module
+    def module():
+        from unittest.mock import patch
+
+        import pytest
+
+        from pydantic.generics import get_caller_module_name
+
+        with pytest.raises(RuntimeError, match='This function must be used inside another function') as exc_info:
+            with patch('inspect.stack', new=lambda: [..., ...]):
+                get_caller_module_name()
+
+        e = exc_info.value
+        assert isinstance(e.__cause__, IndexError)
+        assert isinstance(e.__context__, IndexError)
 
 
 @skip_36
