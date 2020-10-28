@@ -256,6 +256,8 @@ def deque_validator(v: Any) -> Deque[Any]:
 
 
 def enum_member_validator(v: Any, field: 'ModelField', config: 'BaseConfig') -> Enum:
+    if isinstance(v, field.type_):
+        return v
     try:
         enum_v = field.type_(v)
     except ValueError:
